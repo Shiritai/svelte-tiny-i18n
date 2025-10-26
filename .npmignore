@@ -1,0 +1,13 @@
+# 排除所有測試和設定檔
+*.spec.ts
+*.config.ts
+*.config.js
+.github/
+.vscode/
+node_modules/
+src/
+
+# 排除根目錄下的檔案
+.gitignore
+.npmignore
+tsconfig.json
