@@ -1,6 +1,6 @@
 {
     "name": "svelte-tiny-i18n",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "A lightweight, type-safe, and reactive i18n library for Svelte and SvelteKit.",
     "author": "Shiritai",
     "license": "MIT",
