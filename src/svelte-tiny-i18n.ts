@@ -7,7 +7,7 @@
  * https://github.com/Shiritai/svelte-tiny-i18n
  */
 
-import { derived, writable, type Writable } from 'svelte/store';
+import { derived, Readable, writable } from 'svelte/store';
 
 // --- Generic Type Definitions (抽象泛型定義) ---
 
@@ -113,12 +113,11 @@ export type PartialTranslationEntryMap<Locales extends string> = {
  * import { i18n } from '$lib/i18n'; // Import the instance from step 1
  *
  * // Destructure the stores and functions
- * const { t, locale } = i18n;
+ * const { t, locale, setLocale } = i18n;
  *
  * function changeLang() {
- *     // You can 'set' the store value directly
  *     const nextLang = $locale === 'en' ? 'es' : 'en';
- *     locale.set(nextLang);
+ *     setLocale(nextLang);
  * }
  * </script>
  *
@@ -166,12 +165,11 @@ export type PartialTranslationEntryMap<Locales extends string> = {
  * import { i18n } from '$lib/i18n'; // 導入步驟 1 建立的實例
  *
  * // 解構 Svelte stores 和函式
- * const { t, locale } = i18n;
+ * const { t, locale, setLocale } = i18n;
  *
  * function changeLang() {
- * 	// 你可以直接 'set' store 的值
  * 	const nextLang = $locale === 'en' ? 'es' : 'en';
- * 	locale.set(nextLang);
+ * 	setLocale(nextLang);
  * }
  * </script>
  *
@@ -490,15 +488,15 @@ export function createI18nStore<const Locales extends readonly string[]>(
         localStorageKey,
 
         /**
-         * A writable Svelte store holding the current language code.
+         * A readable Svelte store holding the current language code.
          * (e.g., 'en')
          *
          * ---
          *
-         * 一個 Svelte Writable store，儲存當前的語言代碼。
+         * 一個 Svelte Readable store，儲存當前的語言代碼。
          * (例如: 'en')
          */
-        locale: locale as Writable<SupportedLocale>,
+        locale: locale as Readable<SupportedLocale>,
 
         /**
          * The translation function.
@@ -707,7 +705,7 @@ type AnyI18nStore = {
  * function setLanguage(lang: SupportedLocale) {
  *     // The 'lang' variable is now type-checked
  *     // (e.g., only 'en' | 'es' are allowed)
- *     i18n.locale.set(lang);
+ *     i18n.setLocale(lang);
  * }
  *
  * setLanguage('en'); // OK
@@ -729,7 +727,7 @@ type AnyI18nStore = {
  * function setLanguage(lang: SupportedLocale) {
  *     // lang 變數現在會被 TypeScript 檢查
  *     // (例如: 只接受 'en' | 'es')
- *     i18n.locale.set(lang);
+ *     i18n.setLocale(lang);
  * }
  *
  * setLanguage('en'); // OK

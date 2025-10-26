@@ -119,7 +119,7 @@ describe('svelte-tiny-i18n', () => {
             // 即使我們手動嘗試，'fr' 也不應該被加入
             // (這個斷言比較困難，因為 'translations' 是閉包內的變數)
             // 但我們可以透過切換到一個不存在的語言來間接驗證
-            i18n.locale.set('es');
+            i18n.setLocale('es');
             const t_es = get(i18n.t);
             expect(t_es('unsupported.key')).toBe('unsupported.key'); // 'es' 也不存在
 
@@ -136,7 +136,7 @@ describe('svelte-tiny-i18n', () => {
             const t = get(i18n.t);
 
             expect(t('any.key')).toBe('any.key'); // 不應拋出錯誤
-            i18n.locale.set('es');
+            i18n.setLocale('es');
             const t_es = get(i18n.t);
             expect(t_es('any.key')).toBe('any.key'); // 切換語言也不應拋出錯誤
         });
@@ -227,7 +227,7 @@ describe('svelte-tiny-i18n', () => {
 
         it('當某語言缺少翻譯時，應回傳 key 本身', () => {
             const i18n = createTestInstance();
-            i18n.locale.set('zh-TW');
+            i18n.setLocale('zh-TW');
             const t = get(i18n.t);
             // 'bye' 故意缺少 'zh-TW' 翻譯
             expect(t('bye')).toBe('bye');
@@ -238,11 +238,11 @@ describe('svelte-tiny-i18n', () => {
             let t = get(i18n.t);
             expect(t('hello')).toBe('Hello');
 
-            i18n.locale.set('es');
+            i18n.setLocale('es');
             t = get(i18n.t);
             expect(t('hello')).toBe('Hola');
 
-            i18n.locale.set('zh-TW');
+            i18n.setLocale('zh-TW');
             t = get(i18n.t);
             expect(t('hello')).toBe('你好');
         });
@@ -250,7 +250,7 @@ describe('svelte-tiny-i18n', () => {
         it('應正確處理變數替換 (replacements)', () => {
             const i18n = createTestInstance();
             const t = get(i18n.t);
-            expect(t('welcome', { name: 'Gemini' })).toBe('Welcome, Gemini!');
+            expect(t('welcome', { name: 'Meow' })).toBe('Welcome, Meow!');
         });
 
         it('應處理數字 0 作為有效的替換值', () => {
@@ -277,8 +277,8 @@ describe('svelte-tiny-i18n', () => {
                 { 'multi.replace': { en: 'Hello {name}, welcome to {place}!' } }
             ]);
             const t = get(i18n.t);
-            const result = t('multi.replace', { name: 'Gemini', place: 'Taiwan' });
-            expect(result).toBe('Hello Gemini, welcome to Taiwan!');
+            const result = t('multi.replace', { name: 'Meow', place: 'Svelte' });
+            expect(result).toBe('Hello Meow, welcome to Svelte!');
         });
 
         it('當 locale 被 set 為不支援的語言時，_t store 應保持不變', () => {
@@ -295,18 +295,15 @@ describe('svelte-tiny-i18n', () => {
             mockLocalStorage.setItem.mockClear();
 
             // 3. 執行無效的 set
-            // @ts-expect-error 雖然 TS 會警告 (如果 'fr' 不是 SupportedLocale)，但 JS 層面這是可能的
-            i18n.locale.set('fr');
+            i18n.setLocale('fr');
 
             // 4. 驗證 store 狀態
 
-            // 4a. locale store *本身* 確實變成了 'fr'
-            expect(get(i18n.locale)).toBe('fr');
+            // 4a. locale store 不應該變成 'fr', 應該是 'en'
+            expect(get(i18n.locale)).not.toBe('fr');
+            expect(get(i18n.locale)).toBe('en');
 
-            // 4b. localStorage *應該* 仍然被更新了 (因為 subscribe 執行了)
-            expect(mockLocalStorage.setItem).toHaveBeenCalledWith('test-lang-key', 'fr');
-
-            // 4c. [關鍵] 't' 函式 *不應該* 崩潰，且應繼續使用 *上一個* 有效的翻譯 ('en')
+            // 4b. [關鍵] 't' 函式 *不應該* 崩潰，且應繼續使用 *上一個* 有效的翻譯 ('en')
             t = get(i18n.t);
             expect(t('hello')).toBe('Hello'); // 仍然是 'Hello', 而不是 'Hola' 或 key
         });
@@ -368,11 +365,11 @@ describe('svelte-tiny-i18n', () => {
             expect(t('another.key')).toBe('another.key'); // 'en' 不存在
 
             // 切換語言檢查
-            i18n.locale.set('es');
+            i18n.setLocale('es');
             t = get(i18n.t);
             expect(t('new.key')).toBe('Clave Nueva');
 
-            i18n.locale.set('zh-TW');
+            i18n.setLocale('zh-TW');
             t = get(i18n.t);
             expect(t('another.key')).toBe('另一個');
         });
@@ -389,12 +386,12 @@ describe('svelte-tiny-i18n', () => {
             expect(t('hello')).toBe('Hi');
 
             // 檢查 'es'
-            i18n.locale.set('es');
+            i18n.setLocale('es');
             t = get(i18n.t);
             expect(t('hello')).toBe('Que tal');
 
             // 檢查 'zh-TW' (未被覆蓋)
-            i18n.locale.set('zh-TW');
+            i18n.setLocale('zh-TW');
             t = get(i18n.t);
             expect(t('hello')).toBe('你好');
         });
@@ -434,7 +431,7 @@ describe('svelte-tiny-i18n', () => {
         it('應能為現有的 key 合併新的語言翻譯', () => {
             // 'bye' 初始只有 'en' 和 'es'
             const i18n = createTestInstance();
-            i18n.locale.set('zh-TW');
+            i18n.setLocale('zh-TW');
             let t_zh = get(i18n.t);
             expect(t_zh('bye')).toBe('bye'); // 'zh-TW' 缺少 'bye'
 
@@ -445,7 +442,7 @@ describe('svelte-tiny-i18n', () => {
             expect(t_zh('bye')).toBe('再見'); // 應更新
 
             // 不應影響 'en'
-            i18n.locale.set('en');
+            i18n.setLocale('en');
             const t_en = get(i18n.t);
             expect(t_en('bye')).toBe('Goodbye');
         });
@@ -554,17 +551,17 @@ describe('svelte-tiny-i18n', () => {
             vi.stubGlobal('navigator', mockNavigator);
         });
 
-        it('CSR: locale.set 應更新 localStorage', () => {
+        it('CSR: setLocale 應更新 localStorage', () => {
             const i18n = createTestInstance();
             mockLocalStorage.setItem.mockClear();
 
-            i18n.locale.set('es');
+            i18n.setLocale('es');
 
             expect(mockLocalStorage.setItem).toHaveBeenCalledTimes(1);
             expect(mockLocalStorage.setItem).toHaveBeenCalledWith('test-lang-key', 'es');
         });
 
-        it('SSR: locale.set 不應呼叫 localStorage', () => {
+        it('SSR: setLocale 不應呼叫 localStorage', () => {
             // 撤銷這個 describe 區塊的 beforeEach 建立的 browser globals
             vi.unstubAllGlobals();
 
@@ -573,7 +570,7 @@ describe('svelte-tiny-i18n', () => {
 
             const i18n = createTestInstance();
 
-            i18n.locale.set('zh-TW');
+            i18n.setLocale('zh-TW');
 
             expect(mockLocalStorage.setItem).not.toHaveBeenCalled();
         });

@@ -1,8 +1,8 @@
 # svelte-tiny-i18n
 
-[](https://www.google.com/search?q=https://www.npmjs.com/package/svelte-tiny-i18n)
-[](https://opensource.org/licenses/MIT)
-[](https://www.google.com/search?q=https://bundlephobia.com/package/svelte-tiny-i18n)
+[![NPM Version](https://img.shields.io/npm/v/svelte-tiny-i18n)](https://www.npmjs.com/package/svelte-tiny-i18n)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Bundle Size](https://img.shields.io/bundlephobia/minzip/svelte-tiny-i18n)](https://bundlephobia.com/package/svelte-tiny-i18n)
 
 ( English | [繁體中文](./README.zh_tw.md) )
 
@@ -14,11 +14,25 @@ This library is "headless," meaning it only provides the core logic and Svelte s
 
 `svelte-tiny-i18n` is for developers who value **extreme lightweightness, zero dependencies, and zero build-time configuration**, while still enjoying a **native Svelte store experience and instant TypeScript inference**.
 
-Its key advantage is: **You define your translations in your `i18n.ts` config file, and TypeScript _immediately_ gives you type-safety and autocompletion** for both `$t('...')` keys and `locale.set('...')` language codes, all without running a code generator.
+Its key advantage: **Zero-config type safety**. You define your supported locales (e.g., `['en', 'es']`) in a single config file, and TypeScript immediately provides type-checking and autocompletion for your `setLocale` function (e.g., `setLocale('es')` is valid, `setLocale('fr')` is an error) — all without running a code generator.
 
 This makes it the ideal choice for small-to-medium projects and Svelte purists.
 
 ### Example: Minimal SvelteKit Integration
+
+Assuming a project structure like this:
+
+```tree
+/src
+├── /lib
+│   └── i18n.ts         <- 1. Config File
+└── /routes
+    └── /[lang]
+        ├── +layout.ts  <- 2. SvelteKit Integration
+        ├── +page.svelte  <- 3. Usage
+        └── /about
+            └── +page.svelte
+```
 
 1. **`src/lib/i18n.ts`** (Config File)
 
@@ -40,38 +54,30 @@ This makes it the ideal choice for small-to-medium projects and Svelte purists.
     export type SupportedLocale = inferSupportedLocale<typeof i18n>;
     ```
 
-2. **`src/routes/+layout.ts`** (SvelteKit Integration)
+2. **`src/routes/[lang]/+layout.ts`** (SvelteKit Integration)
 
     ```ts
     import { i18n } from '$lib/i18n';
     import type { LayoutLoad } from './$types';
 
     export const load: LayoutLoad = ({ params }) => {
-        // 'lang' comes from your route, e.g., /[[lang]]/
+        // 'lang' comes from your route, e.g., /[lang]/
         i18n.setLocale(params.lang);
         return {};
     };
     ```
 
-3. **`src/routes/+page.svelte`** (Usage)
+3. **`src/routes/[lang]/+page.svelte`** (Usage)
 
     ```svelte
     <script lang="ts">
         import { i18n } from '$lib/i18n';
-        const { t, locale } = i18n;
+        const { t, setLocale } = i18n;
     </script>
 
     <h1>{$t('hello')}</h1>
-    <button on:click={() => locale.set('es')}>Español</button>
+    <button on:click={() => setLocale('es')}>Español</button>
     ```
-
-## Core Concepts
-
-1. **Type-safe by default**: Automatically infers language codes and translation keys from your config.
-2. **Svelte Native**: Built using Svelte stores (`writable` and `derived`). Integration feels fluid and natural.
-3. **SvelteKit Ready**: Correctly handles language detection and initialization in both SSR (Server-Side Rendering) and CSR (Client-Side Rendering).
-4. **Dynamic & Async Loading**: Easily load translations on demand (e.g., for specific pages) using `extendTranslations`.
-5. **Lightweight**: Minimal dependencies and a tiny bundle size.
 
 ## Installation
 
@@ -147,21 +153,14 @@ export type PartialTranslationEntry = inferPartialTranslationEntry<typeof i18n>;
 
 ### 2. Use in Svelte Components
 
-Use the derived store `$t` to get translations, and the `locale` store to read or set the language.
+Use the derived store `$t` to get translations, and the `locale` store to read or `setLocale` to set the language.
 
 ```svelte
 <script lang="ts">
     import { i18n } from '$lib/i18n';
-    import type { SupportedLocale } from '$lib/i18n';
 
     // Destructure the stores and functions
-    const { t, locale } = i18n;
-
-    function setLang(lang: SupportedLocale) {
-        // Just set the store's value.
-        // The '$t' store will update automatically.
-        locale.set(lang);
-    }
+    const { t, locale, setLocale } = i18n;
 </script>
 
 <h1>{$t('hello', { name: 'World' })}</h1>
@@ -169,9 +168,9 @@ Use the derived store `$t` to get translations, and the `locale` store to read o
 <nav>
     <p>Current language: {$locale}</p>
 
-    <button on:click={() => setLang('en')}>English</button>
-    <button on:click={() => setLang('es')}>Español</button>
-    <button on:click={() => setLang('zh-TW')}>繁體中文</button>
+    <button on:click={() => setLocale('en')}>English</button>
+    <button on:click={() => setLocale('es')}>Español</button>
+    <button on:click={() => setLocale('zh-TW')}>繁體中文</button>
 </nav>
 
 <p>{$t('a.missing.key')}</p>
@@ -188,7 +187,7 @@ import type { LayoutLoad } from './$types';
 
 // This load function runs on both SSR and CSR
 export const load: LayoutLoad = ({ params }) => {
-    // 'lang' must match your route parameter, e.g., /[[lang]]/
+    // 'lang' must match your route parameter, e.g., /[lang]/
     const { lang } = params;
 
     // The setLocale function validates the lang
@@ -200,7 +199,7 @@ export const load: LayoutLoad = ({ params }) => {
 };
 ```
 
-**Note:** Your SvelteKit route structure must be similar to `/src/routes/[[lang]]/...` for `params.lang` to be available.
+**Note:** Your SvelteKit route structure must be similar to `/src/routes/[lang]/...` for `params.lang` to be available.
 
 ## Advanced Usage
 
@@ -251,17 +250,17 @@ The new translations are now merged into the store and available via the `$t` fu
 
 `svelte-tiny-i18n` is designed to be the "sweet spot" for Svelte developers who need a simple, fast, and type-safe solution without the overhead of larger libraries.
 
-- **Zero-Config Type Safety**: Get full type-safety for your language codes and translation entries _without_ a build step, code generator, or complex setup. Type-safety is achieved instantly via TypeScript inference from your single configuration object.
-- **Extremely Lightweight**: This library is "tiny" (likely ~1-2kb gzipped). It has **zero dependencies** and does not bundle a heavy ICU message parser, making your app faster.
+- **Zero-Config Type Safety**: Get full type-safety for your language codes _without_ a build step, code generator, or complex setup. Type-safety is achieved instantly via TypeScript inference from your single configuration object.
+- **Extremely Lightweight**: This library is "tiny" (likely <1kb gzipped). It has **zero dependencies** and does not bundle a heavy ICU message parser, making your app faster.
 - **Svelte Native**: Built purely with Svelte stores (`writable` and `derived`), it integrates seamlessly into the Svelte reactivity model.
 - **Simple but Powerful**: Provides all the essential features: SSR/CSR support for SvelteKit, dynamic/async translation loading (`extendTranslations`), and simple variable substitution.
-- **"Headless" by Design**: It provides only the core logic, giving you full control over your UI and integration.
+- **"Headless" by Design**: It provides only the core logic, giving you full control over your UI and integration. (This also means you are responsible for updating the `<html>` `lang` attribute; see the [FAQ for a recipe](#q-how-do-i-dynamically-update-the-html-lang-attribute-or-handle-rtl-right-to-left-languages).)
 
 ## Comparison with Other Libraries
 
 | Dimension            | `svelte-tiny-i18n` (This)                                                    | `typesafe-i18n`                                                         | `svelte-i18n`                                              |
 | :------------------- | :--------------------------------------------------------------------------- | :---------------------------------------------------------------------- | :--------------------------------------------------------- |
-| **Bundle Size**      | **Tiny (~1-2kb)**                                                            | **Tiny (~1kb)**                                                         | **Medium (~15kb+)**                                        |
+| **Bundle Size**      | **Tiny (<1kb)**                                                              | **Tiny (~1kb)**                                                         | **Medium (~15kb+)**                                        |
 | **Core Mechanism**   | Zero-dependency Svelte Stores + Simple String Replace                        | **Build-time Generator**                                                | **Runtime ICU Parser**                                     |
 | **Type Safety**      | **High (Instant Inference)**                                                 | **Very High (Code-Gen)**                                                | Medium (Manual setup)                                      |
 | **Setup Complexity** | **Very Low** (Single config file)                                            | Medium (Requires generator setup)                                       | Low (Install and use)                                      |
@@ -298,7 +297,7 @@ When you call `createI18nStore`, you get an object with:
 - `t`: (Read-only derived store) The translation function.
     - `$t('key')`
     - `$t('key', { placeholder: 'value' })`
-- `locale`: (Writable store) The currently active language code (e.g., `'en'`). You can `set` or `update` this store.
+- `locale`: (Readable store) The currently active language code (e.g., `en`). This store is readable; to update it, use the `setLocale()` function.
 - `setLocale(lang: string | null | undefined)`: A function to safely set the initial language, typically called from the root `+layout.ts`.
     - If `lang` is a supported language, it sets the `locale` store.
     - If `lang` is invalid (or `null`/`undefined`), it's ignored, and the `locale` store **keeps its current value**.
@@ -330,11 +329,46 @@ import type { SupportedLocale } from '$lib/i18n';
 
 // The 'lang' variable is now type-checked
 function setLanguage(lang: SupportedLocale) {
-    i18n.locale.set(lang);
+    i18n.setLocale(lang);
 }
 
 setLanguage('en'); // OK
 setLanguage('fr'); // TypeScript Error
+```
+
+## FAQ / Recipes
+
+### Q: How do I use this in a Svelte (Vite) project _without_ SvelteKit?
+
+A: It's even simpler. You don't need the `+layout.ts` file or the `i18n.setLocale()` step.
+
+The store will automatically initialize its language in the browser by checking `localStorage` and `navigator.language`. You can change the language at any time by simply calling `i18n.setLocale('new_lang')` in your components.
+
+### Q: How do I dynamically update the `<html>` `lang` attribute or handle RTL (Right-to-Left) languages?
+
+A: This library is "headless," so it doesn't modify the DOM for you. You can easily manage this yourself by subscribing to the `locale` store in your root layout component (e.g., `+layout.svelte` for SvelteKit or `App.svelte` for Svelte/Vite).
+
+Here is an example for a SvelteKit project that sets both the `lang` and `dir` attributes:
+
+```svelte
+<script lang="ts">
+    import { i18n } from '$lib/i18n';
+    const { locale } = i18n;
+
+    // Define which of your supported locales are RTL
+    // (e.g., Arabic 'ar', Hebrew 'he')
+    const rtlLocales: string[] = ['ar', 'he'];
+
+    $: if (typeof document !== 'undefined') {
+        const direction = rtlLocales.includes($locale) ? 'rtl' : 'ltr';
+
+        // Dynamically set attributes on <html>
+        document.documentElement.lang = $locale;
+        document.documentElement.dir = direction;
+    }
+</script>
+
+<slot />
 ```
 
 ## License
