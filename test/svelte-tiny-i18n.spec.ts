@@ -7,7 +7,7 @@ import {
     defineI18nConfig,
     type I18nConfig,
     type PartialTranslationEntryMap
-} from './svelte-tiny-i18n'; // 假設您的檔案名稱為 svelte-tiny-i18n.ts
+} from '../src/svelte-tiny-i18n'; // 假設您的檔案名稱為 svelte-tiny-i18n.ts
 
 // 模擬瀏覽器 Globals
 let mockStorage: Record<string, string> = {};
