@@ -25,9 +25,14 @@
     "types": "./dist/svelte-tiny-i18n.d.ts",
     "exports": {
         ".": {
-            "types": "./dist/svelte-tiny-i18n.d.ts",
-            "import": "./dist/svelte-tiny-i18n.mjs",
-            "require": "./dist/svelte-tiny-i18n.js"
+            "import": {
+                "types": "./dist/svelte-tiny-i18n.d.ts",
+                "default": "./dist/svelte-tiny-i18n.js"
+            },
+            "require": {
+                "types": "./dist/svelte-tiny-i18n.d.cts",
+                "default": "./dist/svelte-tiny-i18n.cjs"
+            }
         }
     },
     "files": [
