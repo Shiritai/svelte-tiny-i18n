@@ -1,0 +1,61 @@
+{
+    "name": "svelte-tiny-i18n",
+    "version": "1.0.0",
+    "description": "A lightweight, type-safe, and reactive i18n library for Svelte and SvelteKit.",
+    "author": "Shiritai",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/Shiritai/svelte-tiny-i18n"
+    },
+    "homepage": "https://github.com/Shiritai/svelte-tiny-i18n",
+    "keywords": [
+        "svelte",
+        "sveltekit",
+        "i18n",
+        "internationalization",
+        "typescript",
+        "store",
+        "lightweight",
+        "tiny"
+    ],
+    "type": "module",
+    "main": "./dist/svelte-tiny-i18n.js",
+    "module": "./dist/svelte-tiny-i18n.mjs",
+    "types": "./dist/svelte-tiny-i18n.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/svelte-tiny-i18n.d.ts",
+            "import": "./dist/svelte-tiny-i18n.mjs",
+            "require": "./dist/svelte-tiny-i18n.js"
+        }
+    },
+    "files": [
+        "dist"
+    ],
+    "peerDependencies": {
+        "svelte": "^3.30.0"
+    },
+    "devDependencies": {
+        "@eslint/compat": "^1.2.5",
+        "@types/node": "^22",
+        "eslint": "^9.22.0",
+        "eslint-config-prettier": "^10.0.1",
+        "jiti": "^2.6.1",
+        "jsdom": "^27.0.1",
+        "prettier": "^3.4.2",
+        "svelte": "^5.42.2",
+        "tsup": "^8.0.0",
+        "typescript": "^5.0.0",
+        "typescript-eslint": "^8.20.0",
+        "vitest": "^1.0.0"
+    },
+    "scripts": {
+        "test": "vitest run",
+        "build": "tsup src/svelte-tiny-i18n.ts --format esm,cjs --dts --clean",
+        "prepublishOnly": "npm run build",
+        "eslint-config-prettier": "^10.0.1",
+        "format": "prettier --write .",
+        "lint": "prettier --check . && eslint ."
+    }
+}
