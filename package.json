@@ -49,10 +49,12 @@
         "jiti": "^2.6.1",
         "jsdom": "^27.0.1",
         "prettier": "^3.4.2",
+        "prettier-plugin-svelte": "^3.4.1",
         "svelte": "^5.42.2",
         "tsup": "^8.0.0",
         "typescript": "^5.0.0",
         "typescript-eslint": "^8.20.0",
+        "vite": "^7.3.1",
         "vitest": "^4.0.0"
     },
     "scripts": {
@@ -61,6 +63,8 @@
         "prepublishOnly": "npm run build",
         "eslint-config-prettier": "^10.0.1",
         "format": "prettier --write .",
-        "lint": "prettier --check . && eslint ."
+        "lint": "prettier --check . && eslint .",
+        "test:types": "tsc examples/*.ts --noEmit --esModuleInterop --skipLibCheck --target esnext --module esnext --moduleResolution bundler",
+        "check": "npm run lint && npm run test && npm run test:types"
     }
 }
