@@ -7,7 +7,8 @@
  * https://github.com/Shiritai/svelte-tiny-i18n
  */
 
-import { derived, Readable, writable } from 'svelte/store';
+/// <reference types="vite/client" />
+import { derived, writable, type Readable } from 'svelte/store';
 
 // --- Generic Type Definitions (抽象泛型定義) ---
 
@@ -37,13 +38,16 @@ export interface I18nConfig<Locales extends readonly string[]> {
      */
     localStorageKey: string;
     /**
-     * If true, logs errors to the console when a translation key is not found.
-     * Defaults to true.
-     * ---
-     * 如果為 true, 會在找不到翻譯鍵時在控制台記錄錯誤。
-     * 預設為 true。
+     * Callback function to handle missing translations.
+     * Can be used to log warnings, throw errors, or report to a service.
+     *
+     * @default console.warn in dev, silent in prod
      */
-    devLogs?: boolean;
+    onError?: (error: {
+        key: string;
+        locale: string;
+        type: 'missing_key' | 'missing_locale';
+    }) => void;
 }
 
 /**
@@ -60,19 +64,36 @@ export type TranslationEntryMap<Locales extends string> = {
 };
 
 /**
+ * Recursive type for nested translation objects.
+ */
+export type DeepTranslationObject<Locales extends string> = {
+    [key: string]: string | DeepTranslationObject<Locales>;
+};
+
+/**
  * A translation map where keys are translation keys and values are *partial* translation entries.
- * This is crucial for `extendTranslations` to support loading single-language content (e.g., from .json files).
- * e.g., { my_key: { en: "Hello" } } or { full_key: { en: "Hi", es: "Hola" } }
- *
- * ---
- *
- * 一個翻譯地圖，其鍵值為翻譯鍵，值為 *部分* 的翻譯條目。
- * 這對於 `extendTranslations` 支援載入單一語言內容 (例如 .json 檔案) 至關重要。
- * e.g., { my_key: { en: "Hello" } } 或 { full_key: { en: "Hi", es: "Hola" } }
+ * Now supports nested objects.
+ * e.g., { "home": { "title": { en: "Home" } } }
  */
 export type PartialTranslationEntryMap<Locales extends string> = {
-    [key: string]: Partial<TranslationEntryMap<Locales>>;
+    [key: string]: Partial<TranslationEntryMap<Locales>> | DeepTranslationObject<Locales>;
 };
+
+// --- Type Helpers for Keys (Key 的型別輔助) ---
+
+/**
+ * Recursively flattens an object type to dot-notation keys.
+ * e.g., { a: { b: string } } -> "a.b"
+ */
+export type FlattenKeys<T> = T extends object
+    ? {
+          [K in keyof T & string]: T[K] extends string
+              ? never
+              : T[K][keyof T[K]] extends string | undefined
+                ? K
+                : `${K}.${FlattenKeys<T[K]>}`;
+      }[keyof T & string]
+    : never;
 
 // --- Core i18n Factory Function (核心 i18n 工廠函式) ---
 
@@ -180,9 +201,22 @@ export type PartialTranslationEntryMap<Locales extends string> = {
  * </button>
  * ```
  */
-export function createI18nStore<const Locales extends readonly string[]>(
-    config: I18nConfig<Locales>
-) {
+// 允許使用者透過 Module Augmentation 擴充此介面
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface TinyI18nTranslations {}
+
+/**
+ * createI18nStore
+ * 建立 i18n store 的工廠函式
+ * @template Locales 支援的語言列表
+ * @template Translations 翻譯物件結構 (預設嘗試使用全域擴充介面，若無則回退到 inference)
+ */
+export function createI18nStore<
+    const Locales extends readonly string[],
+    Translations extends readonly object[] = keyof TinyI18nTranslations extends never // 檢查使用者是否擴充了 TinyI18nTranslations (判斷 keyof T 是否為 never)
+        ? PartialTranslationEntryMap<Locales[number]>[] // Fallback (Inference from config)
+        : TinyI18nTranslations[] // Use Global Augmentation
+>(config: I18nConfig<Locales> & { initialTranslations?: Translations }) {
     // --- Type Inference (型別推斷) ---
     type SupportedLocale = Locales[number];
     type FullTranslationMap = Map<SupportedLocale, Map<string, string>>;
@@ -190,9 +224,13 @@ export function createI18nStore<const Locales extends readonly string[]>(
     const {
         supportedLocales,
         defaultLocale,
-        initialTranslations,
+        initialTranslations = [] as unknown as Translations,
         localStorageKey,
-        devLogs = true // Set default value
+        onError = (err) => {
+            if (import.meta.env?.DEV) {
+                console.warn(`[svelte-tiny-i18n] ${err.type}: ${err.key} (locale: ${err.locale})`);
+            }
+        }
     } = config;
 
     /**
@@ -244,39 +282,62 @@ export function createI18nStore<const Locales extends readonly string[]>(
     };
 
     /**
+     * Recursively traverses the input object to find translation strings.
+     */
+    const recursiveFlatten = (prefix: string, item: unknown, result: FullTranslationMap) => {
+        if (typeof item !== 'object' || item === null) return;
+
+        // Strategy: Check if the object contains *any* supported locale as a key.
+        const itemKeys = item as Record<string, unknown>;
+        const keys = Object.keys(itemKeys);
+        const hasSupportedLocale = keys.some((k) =>
+            supportedLocales.includes(k as Locales[number])
+        );
+
+        // Additional check: Ensure the value for that locale is a string (to match TranslationEntryMap)
+        // This disambiguates cases like { en: { nested: "..." } } which is valid language-centric structure?
+        // Wait, if input is `PartialTranslationEntryMap`, the top level keys matches strict structure.
+        // But for `recursiveFlatten` it's generic recursion.
+
+        // If `item` is `{ en: "Hello", fr: "Bonjour" }`:
+        // hasSupportedLocale = true (en).
+        // We act as leaf.
+
+        // If `item` is `{ home: { ... } }`:
+        // 'home' is not a locale. hasSupportedLocale = false.
+        // Recurse.
+
+        if (hasSupportedLocale) {
+            // Treat as Leaf Node
+            supportedLocales.forEach((lang) => {
+                if (itemKeys[lang] && typeof itemKeys[lang] === 'string') {
+                    result.get(lang as SupportedLocale)!.set(prefix, itemKeys[lang] as string);
+                }
+            });
+            return; // Stop recursion for this branch
+        }
+
+        // Treat as Nested Scope
+        Object.entries(itemKeys).forEach(([key, value]) => {
+            const newKey = prefix ? `${prefix}.${key}` : key;
+            recursiveFlatten(newKey, value, result);
+        });
+    };
+
+    /**
      * Converts an array of partial translation entries into the full, nested Map structure.
-     * (e.g., [ { "key": { en: "Hi" } } ] -> Map<'en', Map<'key', 'Hi'>>)
-     *
-     * ---
-     *
-     * 將部分翻譯條目的陣列轉換為完整的、巢狀的 Map 結構。
-     * (例如: [ { "key": { en: "Hi" } } ] -> Map<'en', Map<'key', 'Hi'>>)
+     * Supports nested objects ("home" -> "title" -> { en: "..." }).
      */
     const makeTranslation = (
-        kv_pair: PartialTranslationEntryMap<SupportedLocale>[]
+        kv_pairs: PartialTranslationEntryMap<SupportedLocale>[]
     ): FullTranslationMap => {
         const result = new Map<SupportedLocale, Map<string, string>>();
         supportedLocales.forEach((lang) => {
             result.set(lang, new Map());
         });
 
-        kv_pair.forEach((entry) => {
-            // entry = { "my_key": { en: "Hello", es: "Hola" } }
-            Object.entries(entry).forEach(([key, partialEntry]) => {
-                // key = "my_key"
-                // partialEntry = { en: "Hello", es: "Hola" }
-
-                // 只遍歷 *實際存在* 的語言 (e.g., 'en', 'es')
-                Object.entries(partialEntry).forEach(([lang, value]) => {
-                    // lang = 'en', value = "Hello"
-                    // lang = 'es', value = "Hola"
-
-                    // 確保這個 lang 確實是我們支援的
-                    if (result.has(lang as SupportedLocale)) {
-                        result.get(lang as SupportedLocale)!.set(key, value as string);
-                    }
-                });
-            });
+        kv_pairs.forEach((entry) => {
+            recursiveFlatten('', entry, result);
         });
         return result;
     };
@@ -292,7 +353,9 @@ export function createI18nStore<const Locales extends readonly string[]>(
      * 儲存所有翻譯的完整內部「資料庫」。
      * (Map<語言, Map<鍵, 值>>)
      */
-    const translations = makeTranslation(initialTranslations);
+    const translations = makeTranslation(
+        initialTranslations as unknown as PartialTranslationEntryMap<SupportedLocale>[]
+    );
 
     /**
      * The language to initialize the store with, based on browser/SSR context.
@@ -344,18 +407,26 @@ export function createI18nStore<const Locales extends readonly string[]>(
 
     // --- Derived Store (t function) (衍生 Store) ---
 
-    const t = derived(_t, ($_t) => {
-        return (key: string, replacements?: Record<string, string | number>): string => {
-            let translation = $_t.get(key);
+    // Infer Keys from Translations
+    // Note: If Translations is generic, we can use FlattenKeys<Translations[number]>
+    type InferredKeys = FlattenKeys<Translations[number]>;
+    type AugmentedKeys = FlattenKeys<TinyI18nTranslations>;
+    type Keys = [InferredKeys | AugmentedKeys] extends [never]
+        ? string
+        : InferredKeys | AugmentedKeys;
+
+    const t = derived([_t, locale], ([$_t, $locale]: [Map<string, string>, SupportedLocale]) => {
+        return (key: Keys, replacements?: Record<string, string | number>): string => {
+            let translation = $_t.get(key as string);
             if (translation === undefined) {
-                // For easier debugging, return the key itself if the translation is missing.
-                // 為了方便除錯，如果找不到翻譯，直接回傳 key 本身。
-                translation = key;
-                if (devLogs) {
-                    console.warn(
-                        `[i18n] Translation for key "${key}" not found. Using key as fallback.`
-                    );
-                }
+                // Error Handling
+                onError({
+                    key: key as string,
+                    locale: $locale,
+                    type: 'missing_key'
+                });
+                // Fallback: return key
+                translation = key as string;
             }
             if (replacements) {
                 translation = translation.replace(
@@ -384,8 +455,12 @@ export function createI18nStore<const Locales extends readonly string[]>(
         // 如果 lang 是 null、undefined 或空字串，則不執行任何操作。
         // store 將保持其目前 (或初始) 的值。
         if (!lang) {
-            if (devLogs && lang === '') {
-                console.warn(`[i18n] Initialization failed: ${lang} is not a lang.`);
+            if (lang === '') {
+                onError({
+                    key: '',
+                    locale: 'system',
+                    type: 'missing_locale'
+                });
             }
             return;
         }
@@ -395,52 +470,55 @@ export function createI18nStore<const Locales extends readonly string[]>(
         if (supportedLocales.includes(lang)) {
             locale.set(lang);
         } else {
-            // If not supported, does nothing.
-            // 如果不支援，不做任何事。
-            if (devLogs) {
-                console.warn(
-                    `[i18n] Initialization failed: Language "${lang}" is not in supportedLocales [${supportedLocales.join(
-                        ', '
-                    )}].`
-                );
-            }
+            onError({
+                key: lang,
+                locale: 'system',
+                type: 'missing_locale'
+            });
         }
     }
 
-    function extendTranslations(newTranslations: PartialTranslationEntryMap<SupportedLocale>[]) {
-        const newTranslationMap = makeTranslation(newTranslations);
+    // Extend Translations Function (擴充翻譯函式)
+    const extendTranslations = <
+        NewTranslations extends PartialTranslationEntryMap<SupportedLocale>[]
+    >(
+        newTranslations: NewTranslations
+    ) => {
+        const newTranslationMap = makeTranslation(
+            newTranslations as unknown as PartialTranslationEntryMap<SupportedLocale>[]
+        );
         newTranslationMap.forEach((valueMap, lang) => {
-            const existingMap = translations.get(lang)!;
-            // Merge new translations into the existing map.
-            // 將新的翻譯合併到現有的地圖中。
-            valueMap.forEach((value, key) => {
-                existingMap.set(key, value);
-            });
-        });
-
-        if (devLogs) {
-            console.group('[i18n] Extended translations...');
-            let totalCount = 0;
-            newTranslationMap.forEach((valueMap, lang) => {
-                const count = valueMap.size;
-                if (count > 0) {
-                    console.log(`${count} keys added/updated for lang '${lang}'.`);
-                    totalCount += count;
-                }
-            });
-            if (totalCount === 0) {
-                console.log(`No new translations were added.`);
+            const existingMap = translations.get(lang);
+            if (existingMap) {
+                valueMap.forEach((value, key) => {
+                    existingMap.set(key, value);
+                });
+            } else if (import.meta.env?.DEV && onError) {
+                onError({
+                    key: lang,
+                    locale: lang,
+                    type: 'missing_locale'
+                });
             }
-            console.groupEnd();
-        }
-
-        // Trigger an update to the _t store to refresh the derived 't' function.
-        // 觸發 _t store 更新，以確保 't' 衍生 store 拿到最新資料。
-        locale.update((lang) => {
-            _t.set(translations.get(lang)!);
-            return lang;
         });
-    }
+
+        // Trigger an update
+        locale.update((l) => {
+            if (translations.has(l)) _t.set(translations.get(l)!);
+            return l;
+        });
+
+        // Return a locally-typed 't' store for zero-config usage
+        // 回傳一個區域型別的 't' store，以支援零設定用法
+        type NewKeys = FlattenKeys<NewTranslations[number]>;
+        type MergedKeys = Keys | NewKeys;
+
+        return {
+            t: t as unknown as Readable<
+                (key: MergedKeys, replacements?: Record<string, string | number>) => string
+            >
+        };
+    };
 
     // --- Type Helpers (型別輔助) ---
 

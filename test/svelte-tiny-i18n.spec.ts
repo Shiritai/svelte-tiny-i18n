@@ -27,28 +27,26 @@ const mockNavigator = {
 };
 
 // 模擬 console
+// 模擬 console
 const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-const consoleGroupSpy = vi.spyOn(console, 'group').mockImplementation(() => {});
-const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-const consoleGroupEndSpy = vi.spyOn(console, 'groupEnd').mockImplementation(() => {});
 
 // 輔助函式：建立標準的 i18n 實例
 const createTestInstance = (
     overrides: Partial<I18nConfig<['en', 'es', 'zh-TW']>> = {},
-    initialTranslations: PartialTranslationEntryMap<'en' | 'es' | 'zh-TW'>[] = [
+    initialTranslations = [
         {
             hello: { en: 'Hello', es: 'Hola', 'zh-TW': '你好' },
             welcome: { en: 'Welcome, {name}!', es: 'Bienvenido, {name}!' },
             bye: { en: 'Goodbye', es: 'Adiós' } // 'zh-TW' 故意缺失
         }
-    ]
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ] as any
 ) => {
     const config = defineI18nConfig({
         supportedLocales: ['en', 'es', 'zh-TW'],
         defaultLocale: 'en',
         localStorageKey: 'test-lang-key',
         initialTranslations,
-        devLogs: true,
         ...overrides
     });
     return createI18nStore(config);
@@ -107,11 +105,9 @@ describe('svelte-tiny-i18n', () => {
         });
 
         it('應忽略 initialTranslations 中不支援的語言', () => {
-            const i18n = createTestInstance(
-                {},
-                // @ts-expect-error 包含 'fr' (法文)，但 supportedLocales 只有 ['en', 'es', 'zh-TW']
-                [{ 'unsupported.key': { en: 'Hello', fr: 'Bonjour' } }]
-            );
+            const i18n = createTestInstance({}, [
+                { 'unsupported.key': { en: 'Hello', fr: 'Bonjour' } }
+            ]);
 
             const t = get(i18n.t);
             expect(t('unsupported.key')).toBe('Hello'); // 'en' 應該存在
@@ -127,7 +123,7 @@ describe('svelte-tiny-i18n', () => {
             // 由於 'unsupported.key' 在 'es' 中缺失，*預期*會收到一個 "not found" 警告
             expect(consoleWarnSpy).toHaveBeenCalledTimes(1);
             expect(consoleWarnSpy).toHaveBeenCalledWith(
-                expect.stringContaining('[i18n] Translation for key "unsupported.key" not found')
+                expect.stringContaining('[svelte-tiny-i18n] missing_key: unsupported.key')
             );
         });
 
@@ -143,19 +139,7 @@ describe('svelte-tiny-i18n', () => {
     });
 
     describe('getInitLocale (初始語言邏輯)', () => {
-        describe('SSR (browser: false)', () => {
-            beforeEach(() => {
-                vi.stubGlobal('window', undefined);
-            });
-
-            it('應永遠使用 defaultLocale', () => {
-                mockLocalStorage.setItem('test-lang-key', 'es'); // 應被忽略
-                vi.stubGlobal('navigator', { languages: ['zh-TW'] }); // 應被忽略
-
-                const i18n = createTestInstance();
-                expect(get(i18n.locale)).toBe('en');
-            });
-        });
+        // SSR tests moved to svelte-tiny-i18n.ssr.spec.ts
 
         describe('CSR (browser: true)', () => {
             beforeEach(() => {
@@ -416,18 +400,6 @@ describe('svelte-tiny-i18n', () => {
             unsubscribe();
         });
 
-        it('傳入包含空物件的陣列時應能正常處理', () => {
-            const i18n = createTestInstance({ devLogs: true });
-
-            // 確保呼叫 extendTranslations([{}]) 不會拋出錯誤
-            expect(() => i18n.extendTranslations([{}])).not.toThrow();
-
-            // 並且應記錄 "No new translations"
-            expect(consoleLogSpy).toHaveBeenCalledWith(
-                expect.stringContaining('No new translations were added.')
-            );
-        });
-
         it('應能為現有的 key 合併新的語言翻譯', () => {
             // 'bye' 初始只有 'en' 和 'es'
             const i18n = createTestInstance();
@@ -446,102 +418,87 @@ describe('svelte-tiny-i18n', () => {
             const t_en = get(i18n.t);
             expect(t_en('bye')).toBe('Goodbye');
         });
+    });
 
-        it('傳入空陣列時應能正常處理 (不應出錯)', () => {
-            const i18n = createTestInstance({ devLogs: true });
+    describe('onError (錯誤處理)', () => {
+        it('當 key 找不到時，應呼叫 onError並帶有正確參數', () => {
+            const onErrorSpy = vi.fn();
+            const i18n = createTestInstance({ onError: onErrorSpy });
+            const t = get(i18n.t);
 
-            // 確保呼叫 extendTranslations([]) 不會拋出錯誤
-            expect(() => i18n.extendTranslations([])).not.toThrow();
+            t('missing.key.1');
 
-            // 並且應記錄 "No new translations"
-            expect(consoleLogSpy).toHaveBeenCalledWith(
-                expect.stringContaining('No new translations were added.')
-            );
+            expect(onErrorSpy).toHaveBeenCalledTimes(1);
+            expect(onErrorSpy).toHaveBeenCalledWith({
+                key: 'missing.key.1',
+                locale: 'en',
+                type: 'missing_key'
+            });
+        });
+
+        it('當 setLocale 失敗時，應呼叫 onError', () => {
+            const onErrorSpy = vi.fn();
+            const i18n = createTestInstance({ onError: onErrorSpy });
+
+            i18n.setLocale('fr');
+
+            expect(onErrorSpy).toHaveBeenCalledTimes(1);
+            expect(onErrorSpy).toHaveBeenCalledWith({
+                key: 'fr',
+                locale: 'system',
+                type: 'missing_locale'
+            });
+        });
+
+        it('當 setLocale 傳入空字串時，應呼叫 onError', () => {
+            const onErrorSpy = vi.fn();
+            const i18n = createTestInstance({ onError: onErrorSpy });
+
+            i18n.setLocale('');
+
+            expect(onErrorSpy).toHaveBeenCalledWith({
+                key: '',
+                locale: 'system',
+                type: 'missing_locale'
+            });
         });
     });
 
-    describe('devLogs (日誌功能)', () => {
-        it('當 devLogs: true 時，應對找不到的 key 發出警告', () => {
-            const i18n = createTestInstance({ devLogs: true });
+    describe('Nested JSON Support (巢狀 JSON)', () => {
+        it('應能正確解析巢狀翻譯物件', () => {
+            const i18n = createTestInstance({}, [
+                {
+                    home: {
+                        title: { en: 'Home Title', es: 'Titulo Casa' },
+                        deep: {
+                            label: { en: 'Deep Label' }
+                        }
+                    }
+                }
+            ]);
             const t = get(i18n.t);
-            t('missing.key.1');
-            expect(consoleWarnSpy).toHaveBeenCalledWith(
-                expect.stringContaining('[i18n] Translation for key "missing.key.1" not found')
-            );
+            expect(t('home.title')).toBe('Home Title');
+            expect(t('home.deep.label')).toBe('Deep Label');
+
+            i18n.setLocale('es');
+            const t_es = get(i18n.t);
+            expect(t_es('home.title')).toBe('Titulo Casa');
         });
 
-        it('當 devLogs: false 時，不應發出警告', () => {
-            const i18n = createTestInstance({ devLogs: false });
-            const t = get(i18n.t);
-            t('missing.key.2');
-            expect(consoleWarnSpy).not.toHaveBeenCalled();
-        });
-
-        it('當 devLogs: true 時，應對無效的 setLocale 呼叫發出警告', () => {
-            const i18n = createTestInstance({ devLogs: true });
-            i18n.setLocale('fr');
-            expect(consoleWarnSpy).toHaveBeenCalledWith(
-                expect.stringContaining(
-                    '[i18n] Initialization failed: Language "fr" is not in supportedLocales'
-                )
-            );
-        });
-
-        it('當 devLogs: false 時，不應對無效的 setLocale 呼叫發出警告', () => {
-            const i18n = createTestInstance({ devLogs: false });
-            i18n.setLocale('fr');
-            expect(consoleWarnSpy).not.toHaveBeenCalled();
-        });
-
-        it('當 devLogs: true 時，extendTranslations 應輸出日誌', () => {
-            const i18n = createTestInstance({ devLogs: true });
-            i18n.extendTranslations([{ 'log.key': { en: 'Log' } }]);
-            expect(consoleGroupSpy).toHaveBeenCalledWith(
-                expect.stringContaining('[i18n] Extended translations')
-            );
-            expect(consoleLogSpy).toHaveBeenCalledWith(
-                expect.stringContaining("1 keys added/updated for lang 'en'")
-            );
-            expect(consoleGroupEndSpy).toHaveBeenCalled();
-        });
-
-        it('當 devLogs: false 時，extendTranslations 不應輸出日誌', () => {
-            const i18n = createTestInstance({ devLogs: false });
-            i18n.extendTranslations([{ 'log.key': { en: 'Log' } }]);
-            expect(consoleGroupSpy).not.toHaveBeenCalled();
-            expect(consoleLogSpy).not.toHaveBeenCalled();
-        });
-
-        it('當 devLogs 未設定時，應預設為 true', () => {
-            // 建立一個 *不* 包含 devLogs 的 config
-            const config = defineI18nConfig({
-                supportedLocales: ['en'],
-                defaultLocale: 'en',
-                localStorageKey: 'test-key',
-                initialTranslations: []
-                // devLogs is omitted
-            });
-            const i18n = createI18nStore(config);
+        it('extendTranslations 也應支援巢狀物件', () => {
+            const i18n = createTestInstance();
+            i18n.extendTranslations([
+                {
+                    profile: {
+                        user: {
+                            name: { en: 'User Name' }
+                        }
+                    }
+                }
+            ]);
 
             const t = get(i18n.t);
-            t('missing.key.default');
-
-            // 預設應為 true，所以應該要發出警告
-            expect(consoleWarnSpy).toHaveBeenCalledWith(
-                expect.stringContaining(
-                    '[i18n] Translation for key "missing.key.default" not found'
-                )
-            );
-        });
-
-        it('當 devLogs: true 且 setLocale 傳入空字串時，應發出警告', () => {
-            const i18n = createTestInstance({ devLogs: true });
-            i18n.setLocale('');
-
-            // 檢查 I18nConfig 中針對 '' 的特定警告
-            expect(consoleWarnSpy).toHaveBeenCalledWith(
-                expect.stringContaining('[i18n] Initialization failed:  is not a lang.')
-            );
+            expect(t('profile.user.name')).toBe('User Name');
         });
     });
 
@@ -561,18 +518,6 @@ describe('svelte-tiny-i18n', () => {
             expect(mockLocalStorage.setItem).toHaveBeenCalledWith('test-lang-key', 'es');
         });
 
-        it('SSR: setLocale 不應呼叫 localStorage', () => {
-            // 撤銷這個 describe 區塊的 beforeEach 建立的 browser globals
-            vi.unstubAllGlobals();
-
-            // 像其他 SSR 測試一樣，偽造 window 為 undefined
-            vi.stubGlobal('window', undefined);
-
-            const i18n = createTestInstance();
-
-            i18n.setLocale('zh-TW');
-
-            expect(mockLocalStorage.setItem).not.toHaveBeenCalled();
-        });
+        // SSR test moved to svelte-tiny-i18n.ssr.spec.ts
     });
 });
