@@ -227,7 +227,7 @@ export function createI18nStore<
         initialTranslations = [] as unknown as Translations,
         localStorageKey,
         onError = (err) => {
-            if (import.meta.env?.DEV) {
+            if (typeof process !== 'undefined' && process.env.NODE_ENV !== 'production') {
                 console.warn(`[svelte-tiny-i18n] ${err.type}: ${err.key} (locale: ${err.locale})`);
             }
         }
@@ -493,7 +493,11 @@ export function createI18nStore<
                 valueMap.forEach((value, key) => {
                     existingMap.set(key, value);
                 });
-            } else if (import.meta.env?.DEV && onError) {
+            } else if (
+                typeof process !== 'undefined' &&
+                process.env.NODE_ENV !== 'production' &&
+                onError
+            ) {
                 onError({
                     key: lang,
                     locale: lang,
