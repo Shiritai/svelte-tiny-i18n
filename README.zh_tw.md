@@ -162,7 +162,7 @@ describe('i18n', () => {
 
 ### `svelte-tiny-i18n/eslint` — Lint 規則
 
-flat config 外掛，其 `no-key-assertion` 規則會禁止用型別斷言逃生口 `$t('key' as Parameters<typeof $t>[0])` 來矇騙 key 型別守衛，並附帶 fixer 解開該斷言，讓真正的型別錯誤重新浮現。
+flat config 外掛，其 `no-key-assertion` 規則會禁止用型別斷言逃生口 `$t('key' as Parameters<typeof $t>[0])` 來矇騙 key 型別守衛。它僅在 **靜態 key**（字串字面值或無內插的 template）上觸發 —— 因為唯有這種情況編譯器原本就攔得下來 —— 並附帶 fixer 解開該斷言，讓真正的型別錯誤重新浮現。動態 key 的斷言（`$t(key as ...)`、``$t(`a.${x}` as ...)``）刻意不攔，因為型別守衛本就無從檢查；這類情況請改用 `/testing` 工具稽核。
 
 ```js
 // eslint.config.js

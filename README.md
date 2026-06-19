@@ -162,7 +162,7 @@ Exposed functions: `flattenConfig`, `findMissingLocales`, `findMissingKeys`, `sc
 
 ### `svelte-tiny-i18n/eslint` — Lint Rule
 
-A flat-config plugin whose `no-key-assertion` rule bans the type-cast escape hatch `$t('key' as Parameters<typeof $t>[0])` that silences the key type guard. It ships a fixer that unwraps the cast so the real type error resurfaces.
+A flat-config plugin whose `no-key-assertion` rule bans the type-cast escape hatch `$t('key' as Parameters<typeof $t>[0])` that silences the key type guard. It fires only on a **static key** (a string literal or a no-expression template) — the only case the compiler could have caught — and ships a fixer that unwraps the cast so the real type error resurfaces. Dynamic-key casts (`$t(key as ...)`, ``$t(`a.${x}` as ...)``) are intentionally allowed, since the guard could never check them; audit those with the `/testing` toolkit instead.
 
 ```js
 // eslint.config.js

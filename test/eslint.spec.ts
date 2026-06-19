@@ -23,10 +23,18 @@ describe('eslint: no-key-assertion', () => {
                 { code: `$t('home.title');` },
                 { code: `t('shared.ok');` },
                 { code: `i18n.t('greeting.bye');` },
+                // Interpolating template, no cast.
+                { code: '$t(`a.${x}`);' },
                 // A cast on a non-i18n call must be ignored.
                 { code: `other('x' as Foo);` },
                 // A cast that is not the FIRST argument must be ignored.
-                { code: `$t('home.title', extra as Bar);` }
+                { code: `$t('home.title', extra as Bar);` },
+                // Dynamic-key casts: the guard could never have checked these,
+                // so the cast is a legitimate bridge, not an escape hatch.
+                { code: `$t(key as Parameters<typeof $t>[0]);` },
+                { code: '$t(`calendar.weekdays.${d}` as Parameters<typeof $t>[0]);' },
+                { code: `$t(authError as any);` },
+                { code: `$t(getKey() as any);` }
             ],
             invalid: [
                 {
@@ -36,7 +44,19 @@ describe('eslint: no-key-assertion', () => {
                     errors: [{ messageId: 'noKeyAssertion' }]
                 },
                 {
+                    // Bare `as any` over a static literal.
+                    code: `$t('x' as any);`,
+                    output: `$t('x');`,
+                    errors: [{ messageId: 'noKeyAssertion' }]
+                },
+                {
                     // Angle-bracket assertion form.
+                    code: `$t(<Parameters<typeof $t>[0]>'x');`,
+                    output: `$t('x');`,
+                    errors: [{ messageId: 'noKeyAssertion' }]
+                },
+                {
+                    // Older angle-bracket form, member-expression callee.
                     code: `t(<string>'y');`,
                     output: `t('y');`,
                     errors: [{ messageId: 'noKeyAssertion' }]
@@ -45,6 +65,12 @@ describe('eslint: no-key-assertion', () => {
                     // Member-expression callee `i18n.t`.
                     code: `i18n.t('z' as never);`,
                     output: `i18n.t('z');`,
+                    errors: [{ messageId: 'noKeyAssertion' }]
+                },
+                {
+                    // No-expression template is a static key -> reportable.
+                    code: '$t(`plain.key` as any);',
+                    output: '$t(`plain.key`);',
                     errors: [{ messageId: 'noKeyAssertion' }]
                 }
             ]
