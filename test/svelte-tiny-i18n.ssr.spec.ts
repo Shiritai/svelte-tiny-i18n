@@ -22,6 +22,9 @@ describe('svelte-tiny-i18n (SSR Mode)', () => {
             defaultLocale: 'en',
             localStorageKey: 'test-lang-key',
             initialTranslations,
+            // Opt out of the strict-under-test default; these assert SSR
+            // fallback behavior, not strict throwing.
+            strict: false,
             ...overrides
         });
         return createI18nStore(config);

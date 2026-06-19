@@ -40,14 +40,34 @@ export interface I18nConfig<Locales extends readonly string[]> {
     /**
      * Callback function to handle missing translations.
      * Can be used to log warnings, throw errors, or report to a service.
+     * A user-supplied handler always takes precedence over `strict` mode.
      *
-     * @default console.warn in dev, silent in prod
+     * @default console.warn in dev, silent in prod (or throw when `strict`)
      */
     onError?: (error: {
         key: string;
         locale: string;
         type: 'missing_key' | 'missing_locale';
     }) => void;
+    /**
+     * When `true` and no custom `onError` is supplied, the default handler
+     * THROWS on a missing key/locale instead of warning. This surfaces gaps
+     * loudly so they fail your test suite. A custom `onError` always wins and
+     * is never made to throw on your behalf.
+     *
+     * @default strict only under test (process.env.NODE_ENV === 'test'); dev
+     *          warns and prod stays silent, so existing behavior is unchanged.
+     *
+     * ---
+     *
+     * 當 `strict` 為 `true` 且未提供自訂 `onError` 時，預設處理器會在缺少 key
+     * 或 locale 時直接 THROW，而非僅 warn，讓缺漏在測試中大聲失敗。提供自訂
+     * `onError` 一律優先，且絕不會被代為改成拋錯。
+     *
+     * @default 僅在測試環境 (process.env.NODE_ENV === 'test') 預設啟用；dev 仍
+     *          warn、prod 仍靜默，故既有行為不變。
+     */
+    strict?: boolean;
 }
 
 /**
@@ -226,9 +246,17 @@ export function createI18nStore<
         defaultLocale,
         initialTranslations = [] as unknown as Translations,
         localStorageKey,
+        // Strict only under test by default, so dev/prod behavior is unchanged.
+        strict = typeof process !== 'undefined' && process.env.NODE_ENV === 'test',
+        // Default handler: throw when strict, else warn in dev / silent in prod.
+        // A user-supplied `onError` overrides this entirely and never throws.
         onError = (err) => {
+            const message = `[svelte-tiny-i18n] ${err.type}: ${err.key} (locale: ${err.locale})`;
+            if (strict) {
+                throw new Error(message);
+            }
             if (typeof process !== 'undefined' && process.env.NODE_ENV !== 'production') {
-                console.warn(`[svelte-tiny-i18n] ${err.type}: ${err.key} (locale: ${err.locale})`);
+                console.warn(message);
             }
         }
     } = config;

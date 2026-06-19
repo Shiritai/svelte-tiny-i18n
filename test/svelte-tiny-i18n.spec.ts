@@ -47,6 +47,9 @@ const createTestInstance = (
         defaultLocale: 'en',
         localStorageKey: 'test-lang-key',
         initialTranslations,
+        // These suites assert the warn/fallback path; opt out of the
+        // strict-under-test default (strict mode has its own suite below).
+        strict: false,
         ...overrides
     });
     return createI18nStore(config);
@@ -461,6 +464,57 @@ describe('svelte-tiny-i18n', () => {
                 locale: 'system',
                 type: 'missing_locale'
             });
+        });
+    });
+
+    describe('strict mode (嚴格模式)', () => {
+        it('strict=true 時，缺少 key 應拋出錯誤', () => {
+            const i18n = createTestInstance({ strict: true });
+            const t = get(i18n.t);
+            expect(() => t('missing.key')).toThrowError(/missing_key: missing\.key/);
+        });
+
+        it('strict=true 時，setLocale 傳入不支援語言應拋出錯誤', () => {
+            const i18n = createTestInstance({ strict: true });
+            expect(() => i18n.setLocale('fr')).toThrowError(/missing_locale: fr/);
+        });
+
+        it('strict=true 時，setLocale 傳入空字串應拋出錯誤', () => {
+            const i18n = createTestInstance({ strict: true });
+            expect(() => i18n.setLocale('')).toThrowError(/missing_locale/);
+        });
+
+        it('strict=false 時，缺少 key 應 warn 而非拋出', () => {
+            const i18n = createTestInstance({ strict: false });
+            const t = get(i18n.t);
+            expect(() => t('missing.key')).not.toThrow();
+            expect(consoleWarnSpy).toHaveBeenCalledWith(
+                expect.stringContaining('[svelte-tiny-i18n] missing_key: missing.key')
+            );
+        });
+
+        it('自訂 onError 應覆蓋 strict (永不拋出)', () => {
+            const onErrorSpy = vi.fn();
+            const i18n = createTestInstance({ strict: true, onError: onErrorSpy });
+            const t = get(i18n.t);
+            expect(() => t('missing.key')).not.toThrow();
+            expect(() => i18n.setLocale('fr')).not.toThrow();
+            expect(onErrorSpy).toHaveBeenCalledTimes(2);
+            expect(consoleWarnSpy).not.toHaveBeenCalled();
+        });
+
+        it('預設值：測試環境 (NODE_ENV=test) 應為 strict (拋出)', () => {
+            // 不傳 strict，依賴預設值；vitest 設定 NODE_ENV=test
+            expect(process.env.NODE_ENV).toBe('test');
+            const config = defineI18nConfig({
+                supportedLocales: ['en'],
+                defaultLocale: 'en',
+                localStorageKey: 'strict-default',
+                initialTranslations: [{ hello: { en: 'Hello' } }]
+            });
+            const i18n = createI18nStore(config);
+            const t = get(i18n.t);
+            expect(() => t('missing.key')).toThrow();
         });
     });
 
