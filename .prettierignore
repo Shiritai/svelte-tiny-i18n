@@ -1,3 +1,7 @@
 # Package Managers
 package-lock.json
 pnpm-lock.yaml
+
+# Scanner fixtures are intentionally raw source samples (incl. a cast escape
+# hatch); keep them verbatim so the scanner sees exactly what users write.
+test/fixtures
