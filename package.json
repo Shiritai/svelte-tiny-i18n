@@ -1,6 +1,6 @@
 {
     "name": "svelte-tiny-i18n",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "description": "A lightweight, type-safe, and reactive i18n library for Svelte and SvelteKit.",
     "author": "Shiritai",
     "license": "MIT",
@@ -33,13 +33,53 @@
                 "types": "./dist/svelte-tiny-i18n.d.cts",
                 "default": "./dist/svelte-tiny-i18n.cjs"
             }
+        },
+        "./testing": {
+            "import": {
+                "types": "./dist/testing.d.ts",
+                "default": "./dist/testing.js"
+            },
+            "require": {
+                "types": "./dist/testing.d.cts",
+                "default": "./dist/testing.cjs"
+            }
+        },
+        "./testing/vitest": {
+            "import": {
+                "types": "./dist/testing-vitest.d.ts",
+                "default": "./dist/testing-vitest.js"
+            },
+            "require": {
+                "types": "./dist/testing-vitest.d.cts",
+                "default": "./dist/testing-vitest.cjs"
+            }
+        },
+        "./eslint": {
+            "import": {
+                "types": "./dist/eslint.d.ts",
+                "default": "./dist/eslint.js"
+            },
+            "require": {
+                "types": "./dist/eslint.d.cts",
+                "default": "./dist/eslint.cjs"
+            }
         }
     },
     "files": [
         "dist"
     ],
     "peerDependencies": {
-        "svelte": "^3.30.0 || ^4.0.0 || ^5.0.0"
+        "svelte": "^3.30.0 || ^4.0.0 || ^5.0.0",
+        "eslint": "^8.0.0 || ^9.0.0",
+        "vitest": "^1.0.0 || ^2.0.0 || ^3.0.0 || ^4.0.0"
+    },
+    "peerDependenciesMeta": {
+        "eslint": {
+            "optional": true
+        },
+        "vitest": {
+            "optional": true
+        }
     },
     "devDependencies": {
         "@eslint/compat": "^1.2.5",
@@ -59,9 +99,8 @@
     },
     "scripts": {
         "test": "vitest run",
-        "build": "tsup src/svelte-tiny-i18n.ts --format esm,cjs --dts --clean",
+        "build": "tsup src/svelte-tiny-i18n.ts src/testing.ts src/testing-vitest.ts src/eslint.ts --format esm,cjs --dts --clean",
         "prepublishOnly": "npm run build",
-        "eslint-config-prettier": "^10.0.1",
         "format": "prettier --write .",
         "lint": "prettier --check . && eslint .",
         "test:types": "tsc examples/*.ts --noEmit --esModuleInterop --skipLibCheck --target esnext --module esnext --moduleResolution bundler",
