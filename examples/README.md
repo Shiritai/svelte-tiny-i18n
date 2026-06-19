@@ -30,6 +30,12 @@ If you prefer not to touch global types (`.d.ts`) or want to define translations
 
 This returned store knows about both the existing global keys _and_ the new keys you just added. It requires absolutely no type setup, making it perfect for isolated features or quick prototypes where you want type safety without the architectural commitment.
 
+## 4. Testing Audit
+
+([`4-testing-audit.ts`](./4-testing-audit.ts))
+
+The `svelte-tiny-i18n/testing` subpath is a zero-dependency Node toolkit for auditing coverage outside the type system. This example checks for keys missing a locale, scans your `src` for `$t(...)` usage (separating static literals from dynamic call sites), and runs a single composed `auditTranslations` pass. Wire it into a vitest spec or a CI script to fail builds on untranslated keys.
+
 ---
 
 ## Comparison of Strategies

@@ -30,6 +30,12 @@ npm run test:types
 
 這個回傳的 store 同時擁有了既有的全域 Key _以及_ 您剛剛加入的新 Key。它完全不需要任何型別設定，非常適合獨立的功能模組或快速原型開發，讓您在不需要架構承諾的情況下也能享受型別安全。
 
+## 4. 測試稽核 (Testing Audit)
+
+([`4-testing-audit.ts`](./4-testing-audit.ts))
+
+`svelte-tiny-i18n/testing` 子路徑是一套零依賴的 Node 工具，用於在型別系統之外稽核翻譯覆蓋率。本範例會檢查缺少語言的 key、掃描 `src` 中的 `$t(...)` 用法（區分靜態字面值與動態呼叫點），並執行單次組合的 `auditTranslations`。將它接到 vitest 測試或 CI 腳本，即可在出現未翻譯的 key 時讓建置失敗。
+
 ---
 
 ## 策略比較表

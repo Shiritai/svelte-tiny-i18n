@@ -109,6 +109,72 @@ $t('profile.title'); // ✅ Typed!
 
 See [**Example 2: Global Augmentation**](./examples/2-global-augmentation.ts) and [**Example 3: Zero-Config**](./examples/3-zero-config.ts) for full code.
 
+## Guardrail Tooling
+
+Type inference catches missing keys at the call site, but data-driven keys, dynamic locales, and the cast escape hatch can still slip through. v1.2.0 adds three opt-in guardrails to close that gap.
+
+### Strict Mode
+
+Set `strict: true` in your config and, when you have **not** supplied a custom `onError`, the default handler **throws** on a missing key or unsupported locale instead of warning. This turns silent gaps into hard failures in your test suite.
+
+```ts
+const i18n = createI18nStore(
+    defineI18nConfig({
+        supportedLocales: ['en', 'zh-TW'],
+        defaultLocale: 'en',
+        localStorageKey: 'lang',
+        strict: true, // throw on missing key / locale (default handler only)
+        initialTranslations: [{ hello: { en: 'Hello', 'zh-TW': '你好' } }]
+    })
+);
+```
+
+- **Default**: strict only under test (`process.env.NODE_ENV === 'test'`). Dev still warns and prod stays silent, so existing behavior is unchanged.
+- A custom `onError` **always takes precedence** and is never made to throw on your behalf.
+
+### `svelte-tiny-i18n/testing` — Coverage Audit
+
+A zero-dependency Node toolkit (no Svelte/browser imports) so any app can automate missing-key checks. Compose the pure helpers, or drop in the optional vitest matchers:
+
+```ts
+// i18n.audit.spec.ts
+import { describe, it } from 'vitest';
+import { registerI18nMatchers } from 'svelte-tiny-i18n/testing/vitest';
+import { auditTranslations } from 'svelte-tiny-i18n/testing';
+import { i18nConfig } from './i18n'; // your defineI18nConfig(...) object
+
+registerI18nMatchers();
+
+describe('i18n', () => {
+    it('has complete locales and no missing keys', () => {
+        // Matchers (thin wrappers over the pure functions):
+        expect(i18nConfig).toHaveCompleteLocales();
+        expect(i18nConfig).toHaveNoMissingKeys(['notification.welcome']);
+
+        // Or one composed pass that also scans your source for $t('...') usage:
+        const report = auditTranslations({ config: i18nConfig, dir: './src' });
+        expect(report.ok).toBe(true);
+    });
+});
+```
+
+Exposed functions: `flattenConfig`, `findMissingLocales`, `findMissingKeys`, `scanSourceKeys` (separates static literal keys from dynamic call sites; understands the `as` cast form), and `auditTranslations`. See [**Example 4: Testing Audit**](./examples/4-testing-audit.ts).
+
+### `svelte-tiny-i18n/eslint` — Lint Rule
+
+A flat-config plugin whose `no-key-assertion` rule bans the type-cast escape hatch `$t('key' as Parameters<typeof $t>[0])` that silences the key type guard. It ships a fixer that unwraps the cast so the real type error resurfaces.
+
+```js
+// eslint.config.js
+import i18n from 'svelte-tiny-i18n/eslint';
+
+export default [
+    i18n.configs.recommended // enables svelte-tiny-i18n/no-key-assertion
+];
+```
+
+`eslint` is an (optional) peer dependency, never bundled. Callees default to `['$t', 't', 'i18n.t']` and are configurable.
+
 ## Comparison with Other Libraries
 
 | Dimension            | `svelte-tiny-i18n` (This)                                                    | `typesafe-i18n`                                                         | `svelte-i18n`                                              |
@@ -173,10 +239,14 @@ Creates the instance. Returns:
 
 ### `onError: (error) => void`
 
-Callback in `config` to handle missing keys or locales.
+Callback in `config` to handle missing keys or locales. Always takes precedence over `strict`.
 
 - `error.type`: `'missing_key' | 'missing_locale'`
 - `error.key`: The key or locale that failed.
+
+### `strict: boolean`
+
+When `true` and no custom `onError` is given, the default handler throws instead of warning. Defaults to `true` only under test (`NODE_ENV === 'test'`). See [Strict Mode](#strict-mode).
 
 ## License
 
