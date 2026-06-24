@@ -1,6 +1,7 @@
 # svelte-tiny-i18n
 
 [![NPM Version](https://img.shields.io/npm/v/svelte-tiny-i18n)](https://www.npmjs.com/package/svelte-tiny-i18n)
+[![CI](https://github.com/Shiritai/svelte-tiny-i18n/actions/workflows/ci.yml/badge.svg)](https://github.com/Shiritai/svelte-tiny-i18n/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Bundle Size](https://img.shields.io/bundlephobia/minzip/svelte-tiny-i18n)](https://bundlephobia.com/package/svelte-tiny-i18n)
 
@@ -247,6 +248,19 @@ Callback in `config` to handle missing keys or locales. Always takes precedence 
 ### `strict: boolean`
 
 When `true` and no custom `onError` is given, the default handler throws instead of warning. Defaults to `true` only under test (`NODE_ENV === 'test'`). See [Strict Mode](#strict-mode).
+
+## Contributing & Releasing
+
+CI runs on every push and pull request: lint, type-check, build, and the test suite across Node 20/22/24 and Svelte 4/5, plus a coverage gate (thresholds in `vitest.config.ts`).
+
+Releases are tag-driven. Bump the version and push the tag:
+
+```sh
+npm version patch        # or minor / major -> commits + creates a vX.Y.Z tag
+git push --follow-tags
+```
+
+Pushing a `v*` tag triggers the **Release** workflow, which verifies the tag matches `package.json`, re-runs the checks, publishes to npm with provenance (Trusted Publishing via OIDC -- no tokens), and opens a GitHub Release with auto-generated notes.
 
 ## License
 

@@ -2,6 +2,11 @@ node_modules
 
 # Output
 dist
+coverage
+
+# Local tooling / scratch (not versioned)
+.claude
+.gemini
 
 # OS
 .DS_Store
